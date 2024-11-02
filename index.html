@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="pl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sancreek&display=swap" rel="stylesheet">
+    <title>kółko*krzyżyk</title>
+    <style>
+        body {
+            color: rgb(44, 12, 12);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            font-family: "Sancreek", serif;
+            background: linear-gradient(to bottom, #993300 0%, #999966 50%);
+        }
+
+        .container {
+            text-align: center;
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(5, 100px);
+            grid-template-rows: repeat(5, 100px);
+            gap: 5px;
+        }
+
+        .cell {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100px;
+            height: 100px;
+            font-size: 2em;
+            font-weight: bold;
+            cursor: pointer;
+            background: linear-gradient(to bottom, #993300 0%, #333300 100%);
+            border: 2px solid #621a1a;
+        }
+
+        .cell:hover {
+            background: linear-gradient(to bottom, #993300 0%, #996633 30%);
+        }
+
+        .status {
+            margin-top: 20px;
+            font-size: 1.2em;
+        }
+
+        .resetGame {
+            color: #880404;
+        }
+
+        button {
+            background: linear-gradient(to bottom, #993300 0%, #660033 50%);
+            color: rgb(123, 141, 157);
+            font-family: "Sancreek", serif;
+            margin-top: 10px;
+
+        }
+
+        .wins {
+            margin-top: 10px;
+            font-size: 1em;
+            color: #333;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+        <h1> <i>Gra w kółko i krzyżyk</i></h1>
+        <div class="board" id="board"> </div>
+        <div class="status" id="status">Ruch gracza X</div>
+        <div class="wins" id="wins">Wygrane - Gracz X: 0 | Gracz O: 0</div>
+        <button onclick="resetGame()">Uruchom ponownie grę</button>
+        <button onclick="resetScore()">Zresetuj wyniki</button>
+    </div>
+
+    <script>
+        const boardElement = document.getElementById('board');
+        const statusElement = document.getElementById('status');
+        const winsElement = document.getElementById('wins');
+        let board, currentPlayer, gameActive, winsX, winsO;
+
+        const boardSize = 5
+
+        function loadGame() {
+            board = JSON.parse(localStorage.getItem('board')) || Array(boardSize * boardSize).fill('');
+            currentPlayer = localStorage.getItem('currentPlayer') || 'X';
+            gameActive = JSON.parse(localStorage.getItem('gameActive')) !== false;
+            winsX = parseInt(localStorage.getItem('winsX')) || 0;
+            winsO = parseInt(localStorage.getItem('winsO')) || 0;
+            const savedStatus = localStorage.getItem('statusMessage');
+            statusElement.textContent = savedStatus || `Tura gracza ${currentPlayer}`;
+            updateStatus();
+            createBoard();
+        }
+
+        function saveGame() {
+            localStorage.setItem('board', JSON.stringify(board));
+            localStorage.setItem('currentPlayer', currentPlayer);
+            localStorage.setItem('gameActive', gameActive);
+            localStorage.setItem('statusMessage', statusElement.textContent);
+            localStorage.setItem('winsX', winsX);
+            localStorage.setItem('winsO', winsO);
+        }
+
+        function createBoard() {
+            boardElement.innerHTML = '';
+            board.forEach((cell, index) => {
+                const cellElement = document.createElement('div');
+                cellElement.classList.add('cell');
+                cellElement.addEventListener('click', () => handleCellClick(index));
+                cellElement.textContent = cell;
+                boardElement.appendChild(cellElement);
+            });
+        }
+
+        function handleCellClick(index) {
+            if (board[index] === '' && gameActive) {
+                board[index] = currentPlayer;
+                createBoard();
+                checkResult();
+                if (gameActive) {
+                    currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+                    updateStatus();
+                }
+                saveGame();
+            }
+        }
+
+        function generateWinPatterns(size) {
+            const winPatterns = [];
+
+            for (let row = 0; row < size; row++) {
+                const rowPattern = [];
+                for (let col = 0; col < size; col++) {
+                    rowPattern.push(row * size + col);
+                }
+                winPatterns.push(rowPattern);
+            }
+
+            for (let col = 0; col < size; col++) {
+                const colPattern = [];
+                for (let row = 0; row < size; row++) {
+                    colPattern.push(row * size + col);
+                }
+                winPatterns.push(colPattern);
+            }
+
+            const mainDiagonal = [];
+            for (let i = 0; i < size; i++) {
+                mainDiagonal.push(i * size + i);
+            }
+            winPatterns.push(mainDiagonal);
+
+            const antiDiagonal = [];
+            for (let i = 0; i < size; i++) {
+                antiDiagonal.push(i * size + (size - i - 1));
+            }
+            winPatterns.push(antiDiagonal);
+
+            return winPatterns;
+        }
+        function checkResult() {
+            const winPatterns = generateWinPatterns(boardSize)
+            /* [
+                 // Wiersze
+                 [0, 1, 2, 3, 4],
+                 [5, 6, 7, 8, 9], 
+                 [10, 11, 12, 13, 14],
+                 [15, 16, 17, 18, 19], 
+                 [20, 21, 22, 23, 24],
+                 // Kolumny 
+                 [0, 5, 10, 15, 20], 
+                 [1, 6, 11, 16, 21], 
+                 [2, 7, 12, 17, 22],
+                 [3, 8, 13, 18, 23], 
+                 [4, 9, 14, 19, 24],
+                 // Przekatne
+                 [0, 6, 12, 18, 24], [4, 8, 12, 16, 20]
+             ];*/
+
+            for (const pattern of winPatterns) {
+               /*  const [a, b, c, d, e] = pattern;*/
+                if (pattern.every(index => board[index] === currentPlayer)) {
+                    gameActive = false;
+                    statusElement.textContent = `🎉 Gracz ${currentPlayer} wygrał! 🎉`;
+                    if (currentPlayer === 'X') {
+                        winsX++;
+                    } else {
+                        winsO++;
+                    }
+                    updateWinsDisplay();
+                    saveGame();
+                    return;
+                }
+            }
+
+            if (!board.includes('')) {
+                gameActive = false;
+                statusElement.textContent = "Remis!";
+                saveGame(); 
+            }
+        }
+
+        function updateWinsDisplay() {
+            winsElement.textContent = `Wygrane - Gracz X: ${winsX} | Gracz O: ${winsO}`;
+        }
+        function updateStatus() {
+            if (gameActive) {
+                statusElement.textContent = `Tura gracza ${currentPlayer}`;
+            }
+        }
+
+        function resetGame() {
+            board = Array(boardSize * boardSize).fill('');
+            currentPlayer = 'X';
+            gameActive = true;
+            statusElement.textContent = 'Tura gracza X'; 
+            createBoard();
+           
+            localStorage.removeItem('board');
+            localStorage.removeItem('currentPlayer');
+            localStorage.removeItem('gameActive');
+            localStorage.removeItem('statusMessage');
+            saveGame();
+        }
+       function resetScore() {
+            winsX = 0;
+            winsO = 0; 
+            updateWinsDisplay();
+            localStorage.setItem('winsX', winsX);
+            localStorage.setItem('winsO', winsO);
+        }
+        loadGame();
+    </script>
+
+</body>
+
+</html>
